@@ -1,5 +1,5 @@
-// Placeholder URL - Replace this with your actual Cloudflare Worker URL
-const WORKER_URL = 'https://niche-email-worker.airbrushden.workers.dev';
+// Update this with your actual URL from the Cloudflare Dashboard/GitHub Actions log
+const WORKER_URL = 'https://niche-email-worker.workers.dev';
 
 document.getElementById('generateBtn').addEventListener('click', async () => {
   const status = document.getElementById('status');
@@ -34,21 +34,24 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
           body: JSON.stringify({ profileText: response.data }),
         });
         
-        if (!fetchResponse.ok) {
-          throw new Error(`Worker returned ${fetchResponse.status}: ${fetchResponse.statusText}`);
+        let result;
+        try {
+          result = await fetchResponse.json();
+        } catch (e) {
+          result = { error: 'Invalid JSON response from worker' };
         }
         
-        const result = await fetchResponse.json();
-        
-        if (result.email) {
+        if (fetchResponse.ok && result.email) {
           status.textContent = 'Generation complete!';
           emailResult.value = result.email;
           resultContainer.classList.remove('hidden');
         } else {
-          status.textContent = 'Error: ' + (result.error || 'The worker did not return an email.');
+          const errMsg = result.error || 'Unknown error';
+          const details = result.details ? ` (${result.details})` : '';
+          status.textContent = `Error: ${errMsg}${details}`;
         }
       } catch (error) {
-        status.textContent = 'Worker Error: ' + error.message;
+        status.textContent = 'Network Error: ' + error.message;
         console.error('Fetch error:', error);
       }
     } else {
@@ -75,7 +78,6 @@ document.getElementById('copyBtn').addEventListener('click', async () => {
     }, 2000);
   } catch (err) {
     console.error('Failed to copy!', err);
-    // Fallback for older browsers
     emailResult.select();
     document.execCommand('copy');
   }

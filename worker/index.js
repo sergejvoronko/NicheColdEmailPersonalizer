@@ -11,21 +11,24 @@ export default {
     }
 
     if (request.method !== "POST") {
-      return new Response("Method Not Allowed", { status: 405, headers: corsHeaders });
+      return new Response(JSON.stringify({ error: "Method Not Allowed" }), { 
+        status: 405, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      });
     }
 
     try {
       const { profileText } = await request.json();
 
       if (!profileText) {
-        return new Response(JSON.stringify({ error: "No profile text provided" }), {
+        return new Response(JSON.stringify({ error: "No profile text provided in request body" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      if (!env.GEMINI_API_KEY) {
-        return new Response(JSON.stringify({ error: "API Key not configured on server" }), {
+      if (!env.GEMINI_API_KEY || env.GEMINI_API_KEY === "REPLACE_ME") {
+        return new Response(JSON.stringify({ error: "GEMINI_API_KEY is not configured. Please run 'wrangler secret put GEMINI_API_KEY'." }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -37,25 +40,36 @@ export default {
       Profile Content:
       ${profileText.substring(0, 5000)}`;
 
-      // Calling Google Gemini API
       const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY}`;
       
       const aiResponse = await fetch(geminiUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{
-            parts: [{ text: prompt }]
-          }]
+          contents: [{ parts: [{ text: prompt }] }]
         })
       });
 
       const aiData = await aiResponse.json();
       
-      if (aiData.error) {
-        throw new Error(aiData.error.message || "Gemini API Error");
+      if (!aiResponse.ok) {
+        return new Response(JSON.stringify({ 
+          error: "Gemini API Error", 
+          details: aiData.error?.message || "Unknown Gemini error" 
+        }), {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (!aiData.candidates || aiData.candidates.length === 0 || !aiData.candidates[0].content) {
+        return new Response(JSON.stringify({ 
+          error: "No response from AI", 
+          details: "Gemini returned an empty candidate list. This might be due to safety filters." 
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       const generatedEmail = aiData.candidates[0].content.parts[0].text;
@@ -65,7 +79,10 @@ export default {
       });
 
     } catch (err) {
-      return new Response(JSON.stringify({ error: "Internal Server Error", details: err.message }), {
+      return new Response(JSON.stringify({ 
+        error: "Worker Internal Error", 
+        details: err.message 
+      }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
