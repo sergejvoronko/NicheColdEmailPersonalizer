@@ -1,0 +1,7 @@
+name = "niche-email-worker"
+main = "index.js"
+compatibility_date = "2024-05-26"
+
+[vars]
+# Placeholder for AI API Key - should be added via 'wrangler secret put AI_API_KEY'
+AI_API_KEY = "REPLACE_ME"
