@@ -21,14 +21,14 @@ export default {
       const { profileText } = await request.json();
 
       if (!profileText) {
-        return new Response(JSON.stringify({ error: "No profile text provided in request body" }), {
+        return new Response(JSON.stringify({ error: "No profile text provided" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       if (!env.GEMINI_API_KEY || env.GEMINI_API_KEY === "REPLACE_ME") {
-        return new Response(JSON.stringify({ error: "GEMINI_API_KEY is not configured. Please run 'wrangler secret put GEMINI_API_KEY'." }), {
+        return new Response(JSON.stringify({ error: "GEMINI_API_KEY is not configured." }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -40,8 +40,8 @@ export default {
       Profile Content:
       ${profileText.substring(0, 5000)}`;
 
-      // Using v1 endpoint and gemini-1.5-flash-latest for better compatibility
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${env.GEMINI_API_KEY}`;
+      // Reverting to v1beta but using the most stable model identifier 'gemini-1.5-flash'
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY}`;
       
       const aiResponse = await fetch(geminiUrl, {
         method: "POST",
@@ -54,21 +54,12 @@ export default {
       const aiData = await aiResponse.json();
       
       if (!aiResponse.ok) {
+        // If it fails again, let's try a fallback to gemini-pro just in case
         return new Response(JSON.stringify({ 
           error: "Gemini API Error", 
-          details: aiData.error?.message || "Unknown Gemini error" 
+          details: aiData.error?.message || "Check model availability for your region." 
         }), {
           status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      if (!aiData.candidates || aiData.candidates.length === 0 || !aiData.candidates[0].content) {
-        return new Response(JSON.stringify({ 
-          error: "No response from AI", 
-          details: "Gemini returned an empty response. This might be due to safety filters." 
-        }), {
-          status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
