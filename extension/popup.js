@@ -1,5 +1,5 @@
 // Update this with your actual URL from the Cloudflare Dashboard/GitHub Actions log
-const WORKER_URL = 'https://niche-email-worker.workers.dev';
+const WORKER_URL = 'https://niche-email-worker.airbrushden.workers.dev';
 
 document.getElementById('generateBtn').addEventListener('click', async () => {
   const status = document.getElementById('status');
